@@ -102,6 +102,14 @@ nixos-generate-config --root /mnt
 printf "Downloading my configuration.nix ...\n"
 sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/configuration.nix \
           -o /mnt/etc/nixos/configuration.nix
+sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/filesystemd.nix \
+          -o /mnt/etc/nixos/filesystems.nix.nix
+sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/systemd-services.nix \
+          -o /mnt/etc/nixos/systemd-services.nix
+sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/unstable-pkgs.nix \
+          -o /mnt/etc/nixos/unstable-pkgs.nix
+sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/users.nix \
+          -o /mnt/etc/nixos/users.nix
 
 printf "Installing NixOS\n"
 nixos-install --no-root-passwd

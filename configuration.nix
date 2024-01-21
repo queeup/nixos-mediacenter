@@ -1,33 +1,11 @@
-# https://lazamar.co.uk/nix-versions/
-# let
-#   pkgs = import (builtins.fetchTarball {
-#     url = "https://github.com/NixOS/nixpkgs/archive/5a8650469a9f8a1958ff9373bd27fb8e54c4365d.tar.gz";
-#   }) {};
-#   myPkg-linux-firmware = pkgs.linux-firmware;
-# in
-
-# https://discourse.nixos.org/t/installing-only-a-single-package-from-unstable/5598/4
-#let
-#  unstable = import
-#    (builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-unstable.tar.gz)
-#    # reuse the current configuration
-#    { config = config.nixpkgs.config; };
-#in
-
-# https://lazamar.co.uk/nix-versions/
-# let
-#   pkgs = import (builtins.fetchTarball {
-#     url = "https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz";
-#   }) {};
-#   unstable-tailscale = pkgs.tailscale;
-# in
-
 { config, pkgs, ... }: {
   imports = [
     # "${builtins.fetchGit { url = "https://github.com/NixOS/nixos-hardware.git"; }}/common/gpu/intel"
     ./hardware-configuration.nix
     ./filesystems.nix
     ./users.nix
+    ./unstable-pkgs.nix
+    # ./systemd-services.nix
   ];
 
   boot = {
@@ -59,12 +37,14 @@
     };
   };
 
-  powerManagement.powerUpCommands = ''
-    # ${pkgs.hdparm}/sbin/hdparm -B 128 -M 128 -S 0 \
-    #   /dev/disk/by-uuid/8b4e6bca-be8c-4314-b6ff-ce7cf59978a1
-    ${pkgs.sdparm}/bin/sdparm --flexible -q -6 -l --set STANDBY_Z=0 \
-      /dev/disk/by-uuid/8b4e6bca-be8c-4314-b6ff-ce7cf59978a1
-  '';
+  # powerManagement.powerUpCommands = ''
+  #   # Be aware, this is not working on usb disks.
+  #   # Because this is triggered on Boot Stage 1.
+  #   # ${pkgs.hdparm}/sbin/hdparm -B 128 -M 128 -S 0 \
+  #   #   /dev/disk/by-uuid/8b4e6bca-be8c-4314-b6ff-ce7cf59978a1
+  #   ${pkgs.sdparm}/bin/sdparm --flexible -q -6 -l --set STANDBY_Z=0 \
+  #     /dev/disk/by-uuid/8b4e6bca-be8c-4314-b6ff-ce7cf59978a1
+  # '';
 
   hardware = {
     cpu.intel.updateMicrocode = true;
@@ -124,6 +104,9 @@
     #             https://unix.stackexchange.com/a/657698
     #             man --pager="less -p ^EXAMPLE" systemd-mount
     udev.extraRules = ''
+      # Disable HDD sleep
+      ACTION=="add|change", KERNEL=="sd[a-z]", ATTRS{queue/rotational}=="1", \
+          RUN+="${pkgs.hdparm}/bin/hdparm -S 0 /dev/%k"
       # check for special partitions we dont want mount
       #IMPORT{builtin}="blkid"
       ENV{ID_FS_LABEL}=="media*|backup|data", GOTO="exit"
@@ -201,13 +184,14 @@
       nn = "${pkgs.nano}/bin/nano -E -w -i";
       # sudo = "doas";
     };
+    # Moved to unstable-pkgs.nix.
     # Dont use loginShellInit. bind: command not found
-    interactiveShellInit = ''
-      # hiSHtory: https://github.com/ddworken/hishtory
-      source <(${pkgs.hishtory}/bin/hishtory completion bash)
-      source ${pkgs.hishtory}/share/hishtory/config.sh
-      # source $(nix --extra-experimental-features "nix-command flakes" eval -f '<nixpkgs>' --raw 'hishtory')/share/hishtory/config.sh
-    '';
+    # interactiveShellInit = ''
+    #   # hiSHtory: https://github.com/ddworken/hishtory
+    #   source <(${pkgs.hishtory}/bin/hishtory completion bash)
+    #   source ${pkgs.hishtory}/share/hishtory/config.sh
+    #   # source $(nix --extra-experimental-features "nix-command flakes" eval -f '<nixpkgs>' --raw 'hishtory')/share/hishtory/config.sh
+    # '';
     systemPackages = with pkgs; [
       # myPkg-linux-firmware
       # unstable-tailscale
