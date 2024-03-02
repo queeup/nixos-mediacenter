@@ -5,6 +5,7 @@
     ./filesystems.nix
     ./users.nix
     ./unstable-pkgs.nix
+    ./restic-backups.nix
     # ./systemd-services.nix
   ];
 
