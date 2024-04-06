@@ -38,6 +38,7 @@ in
   environment = {
     systemPackages = with pkgs; [
       unstable.hishtory
+      unstable.tailscale
     ];
     # Dont use loginShellInit. bind: command not found
     interactiveShellInit = ''
@@ -47,4 +48,5 @@ in
       # source $(nix --extra-experimental-features "nix-command flakes" eval -f '<nixpkgs>' --raw 'hishtory')/share/his>
     '';
   };
+  services.tailscale.package = unstable.tailscale;
 }
