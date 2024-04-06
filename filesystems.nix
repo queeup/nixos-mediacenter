@@ -8,17 +8,17 @@
     "/data/media" = {
       device = "/dev/disk/by-uuid/8b4e6bca-be8c-4314-b6ff-ce7cf59978a1";
       fsType = "btrfs";
-      options = [ "subvol=media" "compress-force=zstd" "noatime" ];
+      options = [ "subvol=media" "compress-force=zstd" "noatime" "nofail" "x-systemd.device-timeout=0" "x-systemd.mount-timeout=0" ];
     };
     "/data/backup" = {
       device = "/dev/disk/by-uuid/8b4e6bca-be8c-4314-b6ff-ce7cf59978a1";
       fsType = "btrfs";
-      options = [ "subvol=backup" "compress-force=zstd" "noatime" ];
+      options = [ "subvol=backup" "compress-force=zstd" "noatime" "nofail" "x-systemd.device-timeout=0" "x-systemd.mount-timeout=0" ];
     };
     "/data/photos" = {
       device = "/dev/disk/by-uuid/8b4e6bca-be8c-4314-b6ff-ce7cf59978a1";
       fsType = "btrfs";
-      options = [ "subvol=photos" "compress-force=zstd" "noatime" ];
+      options = [ "subvol=photos" "compress-force=zstd" "noatime" "nofail" "x-systemd.device-timeout=0" "x-systemd.mount-timeout=0" ];
     };
     # "/transcodes" = {
     #   device = "tmpfs";
