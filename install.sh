@@ -77,7 +77,7 @@ umount /mnt
 # Mounting
 printf "Mounting ...\n"
 ## btrfs subvolumes
-mount -o compress-force=zstd,subvol=root /dev/sda2 /mnt
+mount -o compress=zstd,subvol=root /dev/sda2 /mnt
 mkdir /mnt/{home,nix,var}
 if [ "$1" = "--swap-file" ]
     then
@@ -85,9 +85,9 @@ if [ "$1" = "--swap-file" ]
         btrfs filesystem mkswapfile --size 2G --uuid clear /mnt/swap/swapfile
         swapon /mnt/swap/swapfile
 fi
-mount -o compress-force=zstd,noatime,subvol=home /dev/sda2 /mnt/home
-mount -o compress-force=zstd,noatime,subvol=nix /dev/sda2 /mnt/nix
-mount -o compress-force=zstd,noatime,subvol=var /dev/sda2 /mnt/var
+mount -o compress=zstd,noatime,subvol=home /dev/sda2 /mnt/home
+mount -o compress=zstd,noatime,subvol=nix /dev/sda2 /mnt/nix
+mount -o compress=zstd,noatime,subvol=var /dev/sda2 /mnt/var
 ## boot partition
 mkdir -p /mnt/boot
 mount -L boot /mnt/boot  # mount /dev/disk/by-label/boot /mnt/boot
@@ -103,7 +103,7 @@ printf "Downloading my configuration.nix ...\n"
 sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/configuration.nix \
           -o /mnt/etc/nixos/configuration.nix
 sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/filesystemd.nix \
-          -o /mnt/etc/nixos/filesystems.nix.nix
+          -o /mnt/etc/nixos/filesystems.nix
 sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/systemd-services.nix \
           -o /mnt/etc/nixos/systemd-services.nix
 sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/unstable-pkgs.nix \
