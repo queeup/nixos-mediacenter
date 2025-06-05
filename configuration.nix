@@ -195,8 +195,8 @@
     # '';
     systemPackages = with pkgs; [
       # myPkg-linux-firmware
-      # unstable-tailscale
-      hishtory
+      # tailscale  # from unstable-pkgs.nix
+      # hishtory  # from unstable-pkgs.nix
       duf
     ];
   };
