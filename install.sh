@@ -1,33 +1,75 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Links
 # https://nixos.wiki/wiki/Btrfs
 # https://nixos.org/manual/nixos/stable/#sec-installation-manual-summary
 
-help() {
+DEVICE=""
+CREATE_SWAP=0
+CPU=""
+
+function help() {
 echo \
 "
 SYNOPSIS
-   $(basename "${BASH_SOURCE[0]}") [--help] [--noswap] [--swap-file] [--swap-partition]
+   $(basename "${BASH_SOURCE[0]}") [--help]
 
 DESCRIPTION
    Partition, format, mount and then install NixOS
 
 OPTIONS
-   --noswap                   Do not create swap
+   --device                   Device to install
+   --cpu [amd|intel]          Specify the CPU vendor (amd or intel)
    --swap-file                Create swap file
-   --swap-partition           Create swap partition
    --help                     Print this help
- 
-EXAMPLES
-   $(basename "${BASH_SOURCE[0]}") --noswap
 "
 }
 
-if [ -z "$1" ] || [ "$1" = "--help" ]
-    then
-        help
-        exit 1
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --device)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "Error: --device requires a device path (e.g., /dev/sda)"
+                exit 1
+            fi
+            DEVICE="$2"
+            shift 2
+            ;;
+        --cpu)
+            # CPU argümanının amd veya intel olup olmadığını kontrol et
+            if [[ "$2" != "amd" && "$2" != "intel" ]]; then
+                echo "Error: --cpu must be 'amd' or 'intel'"
+                exit 1
+            fi
+            CPU="$2"
+            shift 2
+            ;;
+        --swap-file)
+            CREATE_SWAP=1
+            shift 1
+            ;;
+        --help)
+            help
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            help
+            exit 1
+            ;;
+    esac
+done
+
+if [ -z "$DEVICE" ]; then
+    echo "Please submit a device to install (e.g., --device /dev/sda)"
+    help
+    exit 1
+fi
+
+if [ -z "$CPU" ]; then
+    echo "Please specify a CPU vendor (e.g., --cpu amd)"
+    help
+    exit 1
 fi
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -35,81 +77,64 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# nix-env -iA nixos.git
-
 # Partitioning
-printf "Partitioning ...\n"
-parted /dev/sda -- mklabel gpt
-parted /dev/sda -- mkpart ESP fat32 1MB 512MB
-if [ "$1" = "--noswap" ]
-    then
-        parted /dev/sda -- mkpart primary 512MB 100%
-fi
-if [ "$1" = "--swap-partition" ]
-    then
-        parted /dev/sda -- mkpart primary 512MB -8GB
-        parted /dev/sda -- mkpart primary linux-swap -8GB 100%
-fi
-parted /dev/sda -- set 1 esp on
+printf "\nPartitioning %s ...\n" "${DEVICE}"
+parted "${DEVICE}" -- mklabel gpt
+parted "${DEVICE}" -- mkpart root btrfs 512MB 100%
+parted "${DEVICE}" -- mkpart ESP fat32 1MB 512MB
+parted "${DEVICE}" -- set 2 esp on
+partprobe "${DEVICE}"
+udevadm settle
 
 # Formatting
-printf "Formating ...\n"
-mkfs.fat -F 32 -n boot /dev/sda1
-mkfs.btrfs -L nixos /dev/sda2
-if [ "$1" = "--swap-partition" ]
-    then
-        mkswap -L swap /dev/sda3
-        swapon /dev/sda3
-fi
+printf "\nFormatting partitions on %s ...\n" "${DEVICE}"
+mkfs.btrfs -L nixos "/dev/disk/by-partlabel/root"
+mkfs.fat -F 32 -n boot "/dev/disk/by-partlabel/ESP"
+
 ## create subvolumes
-printf "Creating btrfs subvolumes ...\n"
-mount -L nixos /mnt  # mount /dev/disk/by-label/nixos /mnt
-btrfs subvolume create /mnt/root
-btrfs subvolume create /mnt/home
-btrfs subvolume create /mnt/nix
-btrfs subvolume create /mnt/var
-if [ "$1" = "--swap-file" ]
-    then
-        btrfs subvolume create /mnt/swap
+printf "\nCreating btrfs subvolumes ...\n"
+mount "/dev/disk/by-partlabel/root" /mnt  # mount -L nixos /mnt
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@nix
+btrfs subvolume create /mnt/@var
+chattr +C /mnt/@nix  # disable CoW
+chattr +C /mnt/@var  # disable CoW
+if [ "$CREATE_SWAP" -eq 1 ]; then
+    btrfs subvolume create /mnt/@swap
+    chattr +C /mnt/@swap  # disable CoW
 fi
 umount /mnt
 
 # Mounting
-printf "Mounting ...\n"
+printf "\nMounting partitions ...\n"
 ## btrfs subvolumes
-mount -o compress=zstd,subvol=root /dev/sda2 /mnt
-mkdir /mnt/{home,nix,var}
-if [ "$1" = "--swap-file" ]
-    then
-        mkdir /mnt/swap # with swapfile
-        btrfs filesystem mkswapfile --size 2G --uuid clear /mnt/swap/swapfile
-        swapon /mnt/swap/swapfile
+mount -o compress=zstd,subvol=@ "/dev/disk/by-partlabel/root" /mnt
+mkdir -p /mnt/{home,nix,var}
+mount -o compress=zstd,noatime,subvol=@home "/dev/disk/by-partlabel/root" /mnt/home
+mount -o noatime,subvol=@nix "/dev/disk/by-partlabel/root" /mnt/nix  # nodatacow with chattr +C /mnt/@nix
+mount -o noatime,subvol=@var "/dev/disk/by-partlabel/root" /mnt/var  # nodatacow with chattr +C /mnt/@var
+if [ "$CREATE_SWAP" -eq 1 ]; then
+    mkdir -p /mnt/swap
+    mount -o noatime,subvol=@swap "/dev/disk/by-partlabel/root" /mnt/swap  # nodatacow with chattr +C /mnt/@swap
+    btrfs filesystem mkswapfile --size 4G --uuid clear /mnt/swap/swapfile
+    swapon /mnt/swap/swapfile
 fi
-mount -o compress=zstd,noatime,subvol=home /dev/sda2 /mnt/home
-mount -o compress=zstd,noatime,subvol=nix /dev/sda2 /mnt/nix
-mount -o compress=zstd,noatime,subvol=var /dev/sda2 /mnt/var
+
 ## boot partition
 mkdir -p /mnt/boot
-mount -L boot /mnt/boot  # mount /dev/disk/by-label/boot /mnt/boot
-## transcode partition for transcode to ram
-### https://github.com/binhex/documentation/blob/master/docker/faq/plex.md
-mkdir -p /mnt/transcodes
-mount -t tmpfs -o size=4g -o mode=755 tmpfs /mnt/transcodes
+mount -o umask=0077 "/dev/disk/by-partlabel/ESP" /mnt/boot  # mount -o umask=0077 -L boot /mnt/boot
 
 # Generate nix config
-nixos-generate-config --root /mnt
+# nixos-generate-config --root /mnt
 
-printf "Downloading my configuration.nix ...\n"
-sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/configuration.nix \
-          -o /mnt/etc/nixos/configuration.nix
-sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/filesystemd.nix \
-          -o /mnt/etc/nixos/filesystems.nix
-sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/systemd-services.nix \
-          -o /mnt/etc/nixos/systemd-services.nix
-sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/unstable-pkgs.nix \
-          -o /mnt/etc/nixos/unstable-pkgs.nix
-sudo curl -L -s https://github.com/queeup/nixos-mediacenter/raw/main/users.nix \
-          -o /mnt/etc/nixos/users.nix
+printf "\nDownloading and generating configuration files ...\n"
+curl --silent --create-dirs --remote-name --location --output-dir /mnt/etc/nixos \
+    "https://github.com/queeup/nixos-mediacenter/raw/main/{configuration-${CPU},filesystems,restic-backups,systemd-services,unstable-pkgs,users}.nix"
+nixos-generate-config --root /mnt --show-hardware-config > /mnt/etc/nixos/hardware-configuration.nix
 
-printf "Installing NixOS\n"
+printf "\nSetting up %s configuration ...\n" "${CPU}"
+ln -srf "/mnt/etc/nixos/configuration-${CPU}.nix" "/mnt/etc/nixos/configuration.nix"
+
+printf "\nInstalling NixOS\n"
 nixos-install --no-root-passwd
