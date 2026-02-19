@@ -37,22 +37,17 @@ in
 {
   environment = {
     systemPackages = with pkgs; [
-      unstable.hishtory
       unstable.tailscale
+      unstable.atuin
+      unstable.bash-preexec
+      # unstable.blesh
     ];
-    # Dont use loginShellInit. bind: command not found
     interactiveShellInit = ''
-      # hiSHtory: https://github.com/ddworken/hishtory
-      if [ ! -d ".hishtory" ]; then
-        ${unstable.hishtory}/bin/hishtory init
-        ${unstable.hishtory}/bin/hishtory config-set filter-duplicate-commands true
-        ${unstable.hishtory}/bin/hishtory config-set displayed-columns Hostname Timestamp Command
-        ${unstable.hishtory}/bin/hishtory config-set timestamp-format '2006/01/25 15:04'
-      fi
-      source ${unstable.hishtory}/share/hishtory/config.sh
-      source <(${unstable.hishtory}/bin/hishtory completion bash)
-      # source $(nix --extra-experimental-features "nix-command flakes" eval -f '<nixpkgs>' --raw 'hishtory')/share/his>
+      source ${unstable.bash-preexec}/share/bash/bash-preexec.sh
+      # source ${unstable.blesh}/share/blesh/ble.sh
+      eval "$(${unstable.atuin}/bin/atuin init bash)"
     '';
   };
   services.tailscale.package = unstable.tailscale;
+  # services.atuin.package = unstable.atuin;
 }

@@ -185,14 +185,6 @@
       nn = "${pkgs.nano}/bin/nano -E -w -i";
       # sudo = "doas";
     };
-    # Moved to unstable-pkgs.nix.
-    # Dont use loginShellInit. bind: command not found
-    # interactiveShellInit = ''
-    #   # hiSHtory: https://github.com/ddworken/hishtory
-    #   source <(${pkgs.hishtory}/bin/hishtory completion bash)
-    #   source ${pkgs.hishtory}/share/hishtory/config.sh
-    #   # source $(nix --extra-experimental-features "nix-command flakes" eval -f '<nixpkgs>' --raw 'hishtory')/share/hishtory/config.sh
-    # '';
     systemPackages = with pkgs; [
       # myPkg-linux-firmware
       # tailscale  # from unstable-pkgs.nix
